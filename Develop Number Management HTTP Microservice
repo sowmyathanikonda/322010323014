@@ -1,67 +1,54 @@
-import React, { useState } from "react";
-import axios from "axios";
+from flask import Flask, request, jsonify
 
-const App = () => {
-  const [numbers, setNumbers] = useState([]);
-  const [error, setError] = useState("");
+app = Flask(_name_)
 
-  const handleGetNumbers = async () => {
-    const urlList = [
-      "http://104.211.219.98/numbers/primes",
-      "http://104.211.219.98/numbers/fibo",
-      "http://104.211.219.98/numbers/odd",
-      "http://104.211.219.98/numbers/rand",
-    ];
+# A dictionary to store numbers (simulating a database)
+numbers = {}
 
-    const requests = urlList.map((url) =>
-      axios
-        .get(url, { timeout: 500 })
-        .then((response) => response.data.numbers)
-        .catch((error) => {
-          console.error(`Error fetching numbers from ${url}:`, error);
-          return [];
-        })
-    );
+# Endpoint to add a new number
+@app.route('/add_number', methods=['POST'])
+def add_number():
+    data = request.get_json()
+    number_id = data.get('id')
+    number_value = data.get('value')
 
-    const responses = await Promise.all(
-      requests.map((request) =>
-        Promise.race([
-          request,
-          new Promise((resolve, reject) =>
-            setTimeout(() => reject(new Error("Timeout")), 500)
-          ),
-        ])
-      )
-    );
+    if number_id is None or number_value is None:
+        return jsonify({'error': 'Both id and value are required'}), 400
 
-    const validNumbers = responses
-      .filter((response) => response instanceof Array)
-      .map((response) => response)
-      .flat();
+    numbers[number_id] = number_value
+    return jsonify({'message': 'Number added successfully'}), 201
 
-    const uniqueNumbers = Array.from(new Set(validNumbers));
-    const sortedNumbers = uniqueNumbers.sort((a, b) => a - b);
-    setNumbers(sortedNumbers);
-    setError("");
-  };
+# Endpoint to retrieve a number by ID
+@app.route('/get_number/<int:number_id>', methods=['GET'])
+def get_number(number_id):
+    number_value = numbers.get(number_id)
+    if number_value is None:
+        return jsonify({'error': 'Number not found'}), 404
+    return jsonify({'id': number_id, 'value': number_value}), 200
 
-  return (
-    <div>
-      <h1>Number Management Service</h1>
-      <button onClick={handleGetNumbers}>Get Numbers</button>
-      {error && <p>{error}</p>}
-      {numbers.length > 0 && (
-        <div>
-          <h2>Numbers</h2>
-          <ul>
-            {numbers.map((number) => (
-              <li key={number}>{number}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
+# Endpoint to update the value of an existing number
+@app.route('/update_number/<int:number_id>', methods=['PUT'])
+def update_number(number_id):
+    data = request.get_json()
+    new_number_value = data.get('value')
 
-export default App;
+    if number_id not in numbers:
+        return jsonify({'error': 'Number not found'}), 404
+
+    if new_number_value is None:
+        return jsonify({'error': 'New value is required'}), 400
+
+    numbers[number_id] = new_number_value
+    return jsonify({'message': 'Number updated successfully'}), 200
+
+# Endpoint to delete a number by ID
+@app.route('/delete_number/<int:number_id>', methods=['DELETE'])
+def delete_number(number_id):
+    if number_id not in numbers:
+        return jsonify({'error': 'Number not found'}), 404
+
+    del numbers[number_id]
+    return jsonify({'message': 'Number deleted successfully'}), 200
+
+if _name_ == '_main_':
+    app.run(debug=True)
